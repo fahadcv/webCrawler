@@ -1,0 +1,7 @@
+# exclude the files
+/*.out
+/*.log
+/taget
+/*.txt
+/*.iml
+/.idea
