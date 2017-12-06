@@ -8,10 +8,7 @@ import com.fhd.webcrawler.model.WebPage;
 import com.fhd.webcrawler.writer.CrawlResultWriter;
 
 import javax.inject.Inject;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Created by fahad on 03-12-2017.
@@ -22,7 +19,8 @@ public class WebCrawlerEngine {
     CrawlResultWriter writer;
     Set<String> visitedLinks;
     Map<String, String> failedLinks;
-    int MAX_CRAWL_DEPTH = 64;
+    Map<String, String> noRetryFailedLinks;
+    int MAX_CRAWL_DEPTH = 32;
 
     @Inject
     public WebCrawlerEngine(Configuration config, WebCrawler webCrawler, CrawlResultWriter writer) throws CrawlResultWriteException {
@@ -30,12 +28,13 @@ public class WebCrawlerEngine {
         this.webCrawler = webCrawler;
         this.writer = writer;
         visitedLinks = new HashSet<String>();
-        failedLinks = new HashMap();
+        failedLinks = new HashMap<String, String>();
+        noRetryFailedLinks = new HashMap<String, String>();
     }
 
 //    public CompletionStage<CrawlStatus> startCrawling() {
 //        return CompletableFuture.supplyAsync(() -> {
-//            return new CrawlStatus();
+//            return doCrawling();
 //        });
 //    }
 
@@ -45,7 +44,7 @@ public class WebCrawlerEngine {
             WebPage page = webCrawler.crawl(seedUrl);
             visitedLinks.add(seedUrl);
             page.setUrl(seedUrl);
-            writer.write(new WebLink().withLink(seedUrl), page);
+            writer.writeVisited(new WebLink().withLink(seedUrl), page);
             crawlPage(page, 1);
             writer.complete();
             if (!failedLinks.isEmpty()) {
@@ -78,23 +77,36 @@ public class WebCrawlerEngine {
         if (page != null && page.getLinks() != null) {
             if (depth < MAX_CRAWL_DEPTH) {
                 for (WebLink link : page.getLinks()) {
-                    if (canVisit(page.getUrl(), link)) {
+                    if (canVisit(page.getUrl(), link) && !noRetryFailedLinks.containsKey(link.getHref())) {
                         try {
                             WebPage resultPage = webCrawler.crawl(link.getHref());
                             resultPage.setUrl(link.getHref());
                             resultPage.setCrawlDepthtoPage(depth);
-                            writer.write(link, resultPage);
+                            writer.writeVisited(link, resultPage);
                             visitedLinks.add(link.getHref());
-                            crawlPage(resultPage, ++depth);
+                            if (resultPage.getLinks() != null && resultPage.getLinks().size() > 0) {
+                                crawlPage(resultPage, ++depth);
+                            }
                         } catch (Exception e) {
                             //TODO retry on recoverable error
+                            e.printStackTrace();
+                            if(failedLinks.containsKey(link.getHref())){
+                                noRetryFailedLinks.put(link.getHref(), e.getMessage());
+                            } else {
+                                failedLinks.put(link.getHref(), e.getMessage());
+                            }
+                        }
+                    } else {
+                        try {
+                            writer.writeNonVisited(link, depth);
+                        } catch (CrawlResultWriteException e) {
                             failedLinks.put(link.getHref(), e.getMessage());
                         }
                     }
                 }
             } else {
 
-                System.err.println("Exceed the MAX_CRAWL_DEPTH; Skipping the navigation to " + page.getLinks());
+                System.err.println("Exceed the MAX_CRAWL_DEPTH; "+MAX_CRAWL_DEPTH+" Skipping the navigation to " + page.getLinks());
             }
 
         }

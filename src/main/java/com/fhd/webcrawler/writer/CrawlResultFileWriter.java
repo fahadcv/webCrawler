@@ -18,12 +18,23 @@ public class CrawlResultFileWriter implements CrawlResultWriter {
         writer = new FileWriter(fileName);
     }
 
-    public Status write(WebLink visitedLink, WebPage resultPage) throws CrawlResultWriteException {
+    public Status writeVisited(WebLink visitedLink, WebPage resultPage) throws CrawlResultWriteException {
         try {
             writer.write(format(resultPage.getCrawlDepthtoPage(), resultPage.getUrl()));
-            for (String image : resultPage.getImages()) {
-                writer.write(format(resultPage.getCrawlDepthtoPage() + 1, image));
+            if(resultPage.getImages() != null) {
+                for (String image : resultPage.getImages()) {
+                    writer.write(format(resultPage.getCrawlDepthtoPage() + 1, image));
+                }
             }
+        } catch (IOException e) {
+            throw new CrawlResultWriteException(e.getMessage(), e.getCause());
+        }
+        return Status.SUCCESS;
+    }
+
+    public Status writeNonVisited(WebLink nonVisitedLink, int depth) throws CrawlResultWriteException {
+        try {
+            writer.write(format(depth, nonVisitedLink.getHref()));
         } catch (IOException e) {
             throw new CrawlResultWriteException(e.getMessage(), e.getCause());
         }

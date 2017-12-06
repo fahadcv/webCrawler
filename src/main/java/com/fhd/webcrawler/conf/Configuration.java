@@ -13,8 +13,8 @@ public class Configuration {
         seedUrl = arg[0];
         if(arg.length>0){
             for(int i =1; i < arg.length; i++) {
-                if (arg[1].startsWith("öut=")) {
-                    outputDestination = arg[1].substring("öut=".length());
+                if (arg[1].startsWith("out=")) {
+                    outputDestination = arg[1].substring("out=".length());
                 }
             }
         }

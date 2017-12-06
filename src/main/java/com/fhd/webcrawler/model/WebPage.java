@@ -33,11 +33,11 @@ public class WebPage {
     }
 
     public void setLinks(Set<WebLink> links) {
-        this.links = links;
+        this.links = new HashSet<WebLink>(links);
     }
 
     public WebPage withLinks(Set<WebLink> links) {
-        this.links = links;
+        this.links = new HashSet<WebLink>(links);
         return this;
     }
 
@@ -46,7 +46,7 @@ public class WebPage {
     }
 
     public void setImages(Set<String> images) {
-        this.images = images;
+        this.images = new HashSet<String>(images);
     }
 
     public void addImage(String img) {
