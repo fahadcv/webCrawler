@@ -1,6 +1,7 @@
 package com.fhd.webcrawler;
 
 import com.fhd.webcrawler.conf.Configuration;
+import com.fhd.webcrawler.exception.CrawlException;
 import com.fhd.webcrawler.exception.CrawlResultWriteException;
 import com.fhd.webcrawler.writer.CrawlResultWriterFactory;
 import com.fhd.webcrawler.writer.CrawlResultWriter;
@@ -20,9 +21,13 @@ public class Main {
             CrawlResultWriter crawlResultWriter = CrawlResultWriterFactory.newInstance(conf.getOutputDestination());
             WebCrawlerEngine webCrawlerEngine = new WebCrawlerEngine(conf, webCrawler, crawlResultWriter);
             webCrawlerEngine.doCrawling();
+            System.out.println(" ****************************************************************************** ");
+            System.out.println("  Total links visited : " + webCrawlerEngine.getVisitedLinks().size());
+            System.out.println("  Total links FAILED  : " + webCrawlerEngine.getFailedLinks().size());
+            System.out.println(" ****************************************************************************** ");
         } catch (CrawlResultWriteException e) {
             e.printStackTrace();
-        } catch (MalformedURLException e) {
+        } catch (CrawlException e) {
             e.printStackTrace();
         }
     }

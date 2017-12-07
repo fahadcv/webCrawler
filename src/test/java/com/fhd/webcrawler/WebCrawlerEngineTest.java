@@ -14,6 +14,7 @@ import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.mockito.AdditionalMatchers.not;
@@ -73,9 +74,9 @@ public class WebCrawlerEngineTest {
             test2ResponsePage.addLink(new WebLink().withLink(newTest2Link1)); //new
             Mockito.when(webCrawler.crawl(newTest2Link1)).thenReturn(emptyResponsePage);
 
-            seedResultPageImages = new HashSet<String>();
-            seedResultPageLinks = new HashSet<WebLink>();
-            seedResultPageExternalLinks = new HashSet<WebLink>();
+            seedResultPageImages = new LinkedHashSet<String>();
+            seedResultPageLinks = new LinkedHashSet<WebLink>();
+            seedResultPageExternalLinks = new LinkedHashSet<WebLink>();
             for (int i = 0; i < 5; i++) {
                 seedResultPageImages.add("mock/img-" + i);
 
@@ -138,16 +139,43 @@ public class WebCrawlerEngineTest {
                 .writeVisited(any(WebLink.class), any(WebPage.class));
         Mockito.verify(crawlResultWriter, Mockito.times(seedResultPageExternalLinks.size() + 2))
                 .writeNonVisited(any(WebLink.class), anyInt());
-        //verify 1 duplicate links are skipped in depth of 1
-        Mockito.verify(crawlResultWriter, Mockito.times(1))
+        //verify no duplicate links are skipped in depth of 1
+        Mockito.verify(crawlResultWriter, Mockito.never())
                 .writeNonVisited(any(WebLink.class), eq(1));
         //verify 1 duplicate links are skipped in depth of 2
         Mockito.verify(crawlResultWriter, Mockito.times(1))
                 .writeNonVisited(any(WebLink.class), eq(2));
-        //verify 4 external links are skipped in depth of 3
-        Mockito.verify(crawlResultWriter, Mockito.times(4))
+        //verify 4 external & 1 duplicate links are skipped in depth of 3
+        Mockito.verify(crawlResultWriter, Mockito.times(5))
                 .writeNonVisited(any(WebLink.class), eq(3));
         Mockito.verify(crawlResultWriter).complete();
+    }
+
+    @Test
+    public void isAllowedDomain_false() throws Exception {
+        String testUrl = externalUrl+ "/some/extra/path";
+        boolean result = target.isAllowedDomain(testUrl);
+        Assert.assertFalse(result);
+    }
+
+    @Test
+    public void isAllowedDomain_true() throws Exception {
+        boolean result = target.isAllowedDomain(seedUrl + "/some/extra/path");
+        Assert.assertTrue(result);
+    }
+
+    @Test
+    public void canVisit_external() throws Exception {
+        String testUrl = externalUrl+ "/some/extra/path";
+        boolean result = target.canVisit(testUrl);
+        Assert.assertFalse(result);
+    }
+
+    @Test
+    public void canVisit_same_domain() throws Exception {
+        String testUrl = seedUrl+ "/some/extra/path";
+        boolean result = target.canVisit(testUrl);
+        Assert.assertTrue(result);
     }
 
 }

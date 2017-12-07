@@ -14,7 +14,7 @@ public class CrawlResultWriterFactory {
             try {
                 return new CrawlResultFileWriter(fileName);
             } catch (IOException e) {
-                throw new CrawlResultWriteException("Unable to create File : [" + fileName + "]", e.getCause());
+                throw new CrawlResultWriteException("Unable to create File : [" + fileName + "]", e);
             }
         } else {
             //TODO

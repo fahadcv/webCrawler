@@ -1,6 +1,7 @@
 package com.fhd.webcrawler;
 
 import com.fhd.webcrawler.conf.Configuration;
+import com.fhd.webcrawler.exception.CrawlException;
 import com.fhd.webcrawler.exception.CrawlResultWriteException;
 import com.fhd.webcrawler.model.CrawlStatus;
 import com.fhd.webcrawler.model.WebLink;
@@ -8,23 +9,35 @@ import com.fhd.webcrawler.model.WebPage;
 import com.fhd.webcrawler.writer.CrawlResultWriter;
 
 import javax.inject.Inject;
-import java.util.*;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Created by fahad on 03-12-2017.
  */
 public class WebCrawlerEngine {
     private final String seedUrl;
+    private final String seedDomain;
     WebCrawler webCrawler;
     CrawlResultWriter writer;
     Set<String> visitedLinks;
     Map<String, String> failedLinks;
     Map<String, String> noRetryFailedLinks;
-    int MAX_CRAWL_DEPTH = 32;
+    int MAX_CRAWL_DEPTH = 64;
 
     @Inject
-    public WebCrawlerEngine(Configuration config, WebCrawler webCrawler, CrawlResultWriter writer) throws CrawlResultWriteException {
+    public WebCrawlerEngine(Configuration config, WebCrawler webCrawler, CrawlResultWriter writer) throws CrawlResultWriteException, CrawlException {
         this.seedUrl = config.getSeedUrl();
+        try {
+            URL url = new URL(this.seedUrl);
+            seedDomain = url.getHost();
+        } catch (MalformedURLException e) {
+            throw new CrawlException("Invalid seed URL : " + seedUrl, e);
+        }
         this.webCrawler = webCrawler;
         this.writer = writer;
         visitedLinks = new HashSet<String>();
@@ -77,50 +90,58 @@ public class WebCrawlerEngine {
         if (page != null && page.getLinks() != null) {
             if (depth < MAX_CRAWL_DEPTH) {
                 for (WebLink link : page.getLinks()) {
-                    if (canVisit(page.getUrl(), link) && !noRetryFailedLinks.containsKey(link.getHref())) {
-                        try {
+                    String normalizedURL = normalize(link.getHref());
+                    try {
+                        if (canVisit(normalizedURL) && !noRetryFailedLinks.containsKey(link.getHref())) {
+
                             WebPage resultPage = webCrawler.crawl(link.getHref());
                             resultPage.setUrl(link.getHref());
                             resultPage.setCrawlDepthtoPage(depth);
                             writer.writeVisited(link, resultPage);
-                            visitedLinks.add(link.getHref());
+                            visitedLinks.add(normalizedURL);
                             if (resultPage.getLinks() != null && resultPage.getLinks().size() > 0) {
                                 crawlPage(resultPage, ++depth);
                             }
-                        } catch (Exception e) {
-                            //TODO retry on recoverable error
-                            e.printStackTrace();
-                            if(failedLinks.containsKey(link.getHref())){
-                                noRetryFailedLinks.put(link.getHref(), e.getMessage());
-                            } else {
+
+                        } else {
+                            try {
+                                writer.writeNonVisited(link, depth);
+                            } catch (CrawlResultWriteException e) {
                                 failedLinks.put(link.getHref(), e.getMessage());
                             }
                         }
-                    } else {
-                        try {
-                            writer.writeNonVisited(link, depth);
-                        } catch (CrawlResultWriteException e) {
+                    } catch (Exception e) {
+                        //TODO retry on recoverable error
+                        e.printStackTrace();
+                        if (failedLinks.containsKey(link.getHref())) {
+                            noRetryFailedLinks.put(link.getHref(), e.getMessage());
+                        } else {
                             failedLinks.put(link.getHref(), e.getMessage());
                         }
                     }
                 }
             } else {
 
-                System.err.println("Exceed the MAX_CRAWL_DEPTH; "+MAX_CRAWL_DEPTH+" Skipping the navigation to " + page.getLinks());
+                System.err.println("Exceed the MAX_CRAWL_DEPTH; " + MAX_CRAWL_DEPTH + " Skipping the navigation to " + page.getLinks());
             }
-
         }
     }
 
-    private boolean canVisit(String refere, WebLink webLink) {
+    public boolean canVisit(String url) throws CrawlException {
         //TODO check for the content type and robots.txt ownering and any other filter configuration
-        String url = webLink.getHref();
         return url != null &&
                 !visitedLinks.contains(url) &&
-                //only visit pages in the same domain.. //TODO may need to support subdomain?
-                (url.startsWith(seedUrl)) &&
-                !isBookmarkToSamePage(refere, url) &&
+                isAllowedDomain(url) &&
                 (isRelativeURL(url) || isAllowedProtocol(url));
+    }
+
+    public boolean isAllowedDomain(String url) throws CrawlException {
+        try {
+            URL tmp = new URL(url);
+            return tmp.getHost().equalsIgnoreCase(seedDomain);
+        } catch (MalformedURLException e) {
+            throw new CrawlException("Invalid URL found " + url, e);
+        }
     }
 
     private boolean isRelativeURL(String url) {
@@ -138,10 +159,15 @@ public class WebCrawlerEngine {
         return flag;
     }
 
-    private boolean isBookmarkToSamePage(String refere, String url) {
-        boolean flag = (url.startsWith("#") || url.startsWith(refere + "#"));
-        if (flag)
-            System.out.println("Can't Visit " + url + " From the page " + refere);
-        return flag;
+    public String normalize(String url) {
+        int end;
+        if (url != null) {
+            if ((end = url.indexOf('#')) > 0) {
+                url = url.substring(0, end);
+            }
+            url = url.trim();
+            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        }
+        return url;
     }
 }

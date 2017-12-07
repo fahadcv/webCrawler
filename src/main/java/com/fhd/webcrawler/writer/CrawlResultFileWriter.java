@@ -27,7 +27,7 @@ public class CrawlResultFileWriter implements CrawlResultWriter {
                 }
             }
         } catch (IOException e) {
-            throw new CrawlResultWriteException(e.getMessage(), e.getCause());
+            throw new CrawlResultWriteException(e.getMessage(), e);
         }
         return Status.SUCCESS;
     }

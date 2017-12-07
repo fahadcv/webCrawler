@@ -1,6 +1,6 @@
 package com.fhd.webcrawler.model;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -23,7 +23,7 @@ public class WebPage {
 
     public void addLink(WebLink link) {
         if (links == null) {
-            links = new HashSet<WebLink>();
+            links = new LinkedHashSet<WebLink>();
         }
         links.add(link);
     }
@@ -33,11 +33,11 @@ public class WebPage {
     }
 
     public void setLinks(Set<WebLink> links) {
-        this.links = new HashSet<WebLink>(links);
+        this.links = new LinkedHashSet <WebLink>(links);
     }
 
     public WebPage withLinks(Set<WebLink> links) {
-        this.links = new HashSet<WebLink>(links);
+        this.links = new LinkedHashSet <WebLink>(links);
         return this;
     }
 
@@ -46,12 +46,12 @@ public class WebPage {
     }
 
     public void setImages(Set<String> images) {
-        this.images = new HashSet<String>(images);
+        this.images = new LinkedHashSet<String>(images);
     }
 
     public void addImage(String img) {
         if (this.images == null) {
-            images = new HashSet<String>();
+            images = new LinkedHashSet<String>();
         }
         images.add(img);
     }
