@@ -20,6 +20,7 @@ import java.util.Set;
 import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 
 /**
@@ -51,7 +52,13 @@ public class WebCrawlerEngineTest {
     Set<WebLink> seedResultPageExternalLinks;
 
     @Before
-    public void setup() {
+    public void setup() throws Exception {
+        Mockito.when(config.isAllowedProtocol(anyString())).thenReturn(true);
+        Mockito.when(config.getSeedUrl()).thenReturn(seedUrl);
+        target = new WebCrawlerEngine(config, webCrawler, crawlResultWriter);
+    }
+
+    private void setupCrawlData() {
         try {
             emptyResponsePage = new WebPage();
             test1ResponsePage = new WebPage();
@@ -62,16 +69,19 @@ public class WebCrawlerEngineTest {
 
             String newTest1Link1 = seedUrl + "/mock/test1/link-1";
             test1ResponsePage.addLink(new WebLink().withLink(newTest1Link1)); //new
+            Mockito.when(config.isAllowedDomain(newTest1Link1)).thenReturn(true);
             Mockito.when(webCrawler.crawl(newTest1Link1)).thenReturn(emptyResponsePage);
 
             String newTest1Link2 = seedUrl + "/mock/test1/link-2";
             test1ResponsePage.addLink(new WebLink().withLink(newTest1Link2)); //new
+            Mockito.when(config.isAllowedDomain(newTest1Link2)).thenReturn(true);
             Mockito.when(webCrawler.crawl(newTest1Link2)).thenReturn(emptyResponsePage);
 
             test2ResponsePage.addImage("test2/img-1");
             test2ResponsePage.addLink(new WebLink().withLink(seedUrl + "/mock/link-3")); //duplicate
             String newTest2Link1 = seedUrl + "/mock/test2/link-0";
             test2ResponsePage.addLink(new WebLink().withLink(newTest2Link1)); //new
+            Mockito.when(config.isAllowedDomain(newTest2Link1)).thenReturn(true);
             Mockito.when(webCrawler.crawl(newTest2Link1)).thenReturn(emptyResponsePage);
 
             seedResultPageImages = new LinkedHashSet<String>();
@@ -91,11 +101,12 @@ public class WebCrawlerEngineTest {
                 } else {
                     Mockito.when(webCrawler.crawl(url)).thenReturn(emptyResponsePage);
                 }
+                Mockito.when(config.isAllowedDomain(url)).thenReturn(true);
             }
             for (int i = 0; i < 4; i++) {
                 String url = externalUrl + "/mock/link-" + i;
                 seedResultPageExternalLinks.add(new WebLink().withLink(url));
-
+                Mockito.when(config.isAllowedDomain(url)).thenReturn(false);
             }
 
             seedUrlResponsePage = new WebPage();
@@ -108,14 +119,12 @@ public class WebCrawlerEngineTest {
 
             Mockito.when(webCrawler.crawl(seedUrl)).thenReturn(seedUrlResponsePage);
 
-            Mockito.when(config.getSeedUrl()).thenReturn(seedUrl);
             Mockito.when(config.getOutputDestination()).thenReturn("file:someFile.out");
+
             Mockito.when(crawlResultWriter.writeVisited(any(WebLink.class), any(WebPage.class))).thenReturn(CrawlResultWriter.Status.SUCCESS);
             Mockito.when(crawlResultWriter.writeNonVisited(any(WebLink.class), anyInt())).thenReturn(CrawlResultWriter.Status.SUCCESS);
-
             Mockito.doNothing().when(crawlResultWriter).complete();
 
-            target = new WebCrawlerEngine(config, webCrawler, crawlResultWriter);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -125,6 +134,7 @@ public class WebCrawlerEngineTest {
 
     @Test
     public void testDoCrawling() throws Exception {
+        setupCrawlData();
         CrawlStatus status = target.doCrawling();
         Assert.assertEquals(CrawlStatus.SUCCESS, status);
 
@@ -152,30 +162,21 @@ public class WebCrawlerEngineTest {
     }
 
     @Test
-    public void isAllowedDomain_false() throws Exception {
-        String testUrl = externalUrl+ "/some/extra/path";
-        boolean result = target.isAllowedDomain(testUrl);
-        Assert.assertFalse(result);
-    }
-
-    @Test
-    public void isAllowedDomain_true() throws Exception {
-        boolean result = target.isAllowedDomain(seedUrl + "/some/extra/path");
-        Assert.assertTrue(result);
-    }
-
-    @Test
     public void canVisit_external() throws Exception {
         String testUrl = externalUrl+ "/some/extra/path";
+        Mockito.when(config.isAllowedDomain(testUrl)).thenReturn(false);
         boolean result = target.canVisit(testUrl);
         Assert.assertFalse(result);
+        Mockito.verify(config).isAllowedDomain(testUrl);
     }
 
     @Test
     public void canVisit_same_domain() throws Exception {
         String testUrl = seedUrl+ "/some/extra/path";
+        Mockito.when(config.isAllowedDomain(testUrl)).thenReturn(true);
         boolean result = target.canVisit(testUrl);
         Assert.assertTrue(result);
+        Mockito.verify(config).isAllowedDomain(testUrl);
     }
 
 }

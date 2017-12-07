@@ -21,28 +21,23 @@ import java.util.Set;
  */
 public class WebCrawlerEngine {
     private final String seedUrl;
-    private final String seedDomain;
+    private final Configuration config;
     WebCrawler webCrawler;
     CrawlResultWriter writer;
     Set<String> visitedLinks;
     Map<String, String> failedLinks;
-    Map<String, String> noRetryFailedLinks;
+    Set<String> noRetryFailedLinks;
     int MAX_CRAWL_DEPTH = 64;
 
     @Inject
     public WebCrawlerEngine(Configuration config, WebCrawler webCrawler, CrawlResultWriter writer) throws CrawlResultWriteException, CrawlException {
+        this.config = config;
         this.seedUrl = config.getSeedUrl();
-        try {
-            URL url = new URL(this.seedUrl);
-            seedDomain = url.getHost();
-        } catch (MalformedURLException e) {
-            throw new CrawlException("Invalid seed URL : " + seedUrl, e);
-        }
         this.webCrawler = webCrawler;
         this.writer = writer;
         visitedLinks = new HashSet<String>();
         failedLinks = new HashMap<String, String>();
-        noRetryFailedLinks = new HashMap<String, String>();
+        noRetryFailedLinks = new HashSet<String>();
     }
 
 //    public CompletionStage<CrawlStatus> startCrawling() {
@@ -74,6 +69,9 @@ public class WebCrawlerEngine {
         } catch (Exception e) {
             //TODO Error handling
             e.printStackTrace();
+            if(status == CrawlStatus.IN_PROGRESS) {
+                status = CrawlStatus.FAILED;
+            }
         }
         return status;
     }
@@ -92,7 +90,7 @@ public class WebCrawlerEngine {
                 for (WebLink link : page.getLinks()) {
                     String normalizedURL = normalize(link.getHref());
                     try {
-                        if (canVisit(normalizedURL) && !noRetryFailedLinks.containsKey(link.getHref())) {
+                        if (canVisit(normalizedURL) && !noRetryFailedLinks.contains(link.getHref())) {
 
                             WebPage resultPage = webCrawler.crawl(link.getHref());
                             resultPage.setUrl(link.getHref());
@@ -113,8 +111,8 @@ public class WebCrawlerEngine {
                     } catch (Exception e) {
                         //TODO retry on recoverable error
                         e.printStackTrace();
-                        if (failedLinks.containsKey(link.getHref())) {
-                            noRetryFailedLinks.put(link.getHref(), e.getMessage());
+                        if (failedLinks.containsKey(link.getHref()) && e.getMessage().equals(failedLinks.get(link.getHref()))) {
+                            noRetryFailedLinks.add(link.getHref());
                         } else {
                             failedLinks.put(link.getHref(), e.getMessage());
                         }
@@ -131,31 +129,14 @@ public class WebCrawlerEngine {
         //TODO check for the content type and robots.txt ownering and any other filter configuration
         return url != null &&
                 !visitedLinks.contains(url) &&
-                isAllowedDomain(url) &&
-                (isRelativeURL(url) || isAllowedProtocol(url));
-    }
-
-    public boolean isAllowedDomain(String url) throws CrawlException {
-        try {
-            URL tmp = new URL(url);
-            return tmp.getHost().equalsIgnoreCase(seedDomain);
-        } catch (MalformedURLException e) {
-            throw new CrawlException("Invalid URL found " + url, e);
-        }
+                config.isAllowedDomain(url) &&
+                (isRelativeURL(url) || config.isAllowedProtocol(url));
     }
 
     private boolean isRelativeURL(String url) {
         boolean flag = (!url.contains("://"));
         if (flag)
             System.out.println("Visiting " + url + " isRelativeURL");
-        return flag;
-    }
-
-    private boolean isAllowedProtocol(String url) {
-        //Assuming only http & https should be navigated, so that we will not encounter link like mailto:
-        boolean flag = (url.startsWith("http://") || url.startsWith("https://"));
-        if (!flag)
-            System.out.println("Can't Visit " + url + " isNotAllowedProtocol");
         return flag;
     }
 
