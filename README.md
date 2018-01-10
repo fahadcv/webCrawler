@@ -14,7 +14,7 @@ WebCrawler is a simple web crawler based on Java. It will crawl and collect hype
 #### Output will be available in google.com.out file (hostname.out is the default naming convention used for output file)
 
 #### To write the output to specific file, say myOutput.log
-`mvn exec:java -Dexec.mainClass=com.fhd.webcrawler.Main  -Dexec.args="http://google.com out=faile:myOutput.log"`
+`mvn exec:java -Dexec.mainClass=com.fhd.webcrawler.Main  -Dexec.args="http://google.com out=file:myOutput.log"`
 
 ### To simplify, Alternatively there is script to run in both Windows & Unix
 #### In Windows
